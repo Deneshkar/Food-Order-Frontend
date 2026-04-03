@@ -20,9 +20,9 @@ const navigationTheme = {
 };
 
 export default function AppNavigator() {
-  const { user, token, initializing } = useAuth();
+  const { user, token, loading } = useAuth();
 
-  if (initializing) {
+  if (loading) {
     return (
       <View
         style={{
@@ -37,15 +37,13 @@ export default function AppNavigator() {
     );
   }
 
+  let content = <AuthNavigator />;
+
+  if (token && user) {
+    content = user.role === "admin" ? <AdminNavigator /> : <UserNavigator />;
+  }
+
   return (
-    <NavigationContainer theme={navigationTheme}>
-      {!token || !user ? (
-        <AuthNavigator />
-      ) : user.role === "admin" ? (
-        <AdminNavigator />
-      ) : (
-        <UserNavigator />
-      )}
-    </NavigationContainer>
+    <NavigationContainer theme={navigationTheme}>{content}</NavigationContainer>
   );
 }

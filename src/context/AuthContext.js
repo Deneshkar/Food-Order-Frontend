@@ -1,7 +1,9 @@
-import { createContext, useEffect, useState } from "react";
+/* eslint-disable react/prop-types */
+import { createContext, useEffect, useMemo, useState } from "react";
 
 import { getMyProfile, loginUser, registerUser } from "../api/authApi";
 import { setAuthToken } from "../api/client";
+import { API_BASE_URL } from "../utils/constants";
 import { clearAuthData, getStoredToken, getStoredUser, saveAuthData } from "../utils/storage";
 import { extractErrorMessage } from "../utils/helpers";
 
@@ -10,7 +12,7 @@ export const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
-  const [initializing, setInitializing] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [authLoading, setAuthLoading] = useState(false);
 
   useEffect(() => {
@@ -36,17 +38,15 @@ export function AuthProvider({ children }) {
             const data = await getMyProfile();
             await saveAuthData(storedToken, data.user);
             setUser(data.user);
-          } catch (error) {
+          } catch {
             await clearAuthData();
             setToken(null);
             setUser(null);
           }
         }
-      } else if (storedUser) {
-        setUser(storedUser);
       }
     } finally {
-      setInitializing(false);
+      setLoading(false);
     }
   };
 
@@ -110,19 +110,26 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
+  const contextValue = useMemo(
+    () => ({
+      token,
+      user,
+      loading,
+      initializing: loading,
+      authLoading,
+      login,
+      register,
+      refreshProfile,
+      updateCurrentUser,
+      logout,
+      API_BASE_URL,
+    }),
+    [token, user, loading, authLoading]
+  );
+
   return (
     <AuthContext.Provider
-      value={{
-        token,
-        user,
-        initializing,
-        authLoading,
-        login,
-        register,
-        refreshProfile,
-        updateCurrentUser,
-        logout,
-      }}
+      value={contextValue}
     >
       {children}
     </AuthContext.Provider>

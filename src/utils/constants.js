@@ -2,7 +2,7 @@ const runtimeEnv =
   typeof process !== "undefined" && process?.env ? process.env : {};
 
 export const API_BASE_URL =
-  runtimeEnv.EXPO_PUBLIC_API_URL || "http://10.208.126.60:5000/api";
+  runtimeEnv.EXPO_PUBLIC_API_URL || "http://192.168.1.5:5000/api";
 
 export const COLORS = {
   background: "#FFF8EE",
