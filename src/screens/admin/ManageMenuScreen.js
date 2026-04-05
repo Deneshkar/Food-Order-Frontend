@@ -32,6 +32,7 @@ const initialForm = {
   price: "",
   category: "",
   ingredients: "",
+  quantity: "0",
   preparationTime: "20",
   isAvailable: true,
 };
@@ -73,6 +74,15 @@ export default function ManageMenuScreen() {
     [menuItems]
   );
 
+  const totalStock = useMemo(
+    () =>
+      menuItems.reduce(
+        (sum, item) => sum + Number(item.quantity || 0),
+        0
+      ),
+    [menuItems]
+  );
+
   const updateField = (key, value) => {
     setForm((current) => ({
       ...current,
@@ -102,9 +112,18 @@ export default function ManageMenuScreen() {
 
   const handleSubmit = async () => {
     try {
+      const numericQuantity = Number(form.quantity);
+
+      if (Number.isNaN(numericQuantity) || numericQuantity < 0) {
+        Alert.alert("Validation", "Quantity must be a valid non-negative number");
+        return;
+      }
+
       setSaving(true);
+
       const payload = {
         ...form,
+        quantity: String(numericQuantity),
         image: selectedImage,
       };
 
@@ -135,6 +154,7 @@ export default function ManageMenuScreen() {
       price: String(item.price || ""),
       category: item.category?._id || "",
       ingredients: (item.ingredients || []).join(", "),
+      quantity: String(item.quantity ?? 0),
       preparationTime: String(item.preparationTime || 20),
       isAvailable: item.isAvailable,
     });
@@ -155,7 +175,7 @@ export default function ManageMenuScreen() {
         <SectionTitle
           eyebrow="Admin"
           title="Menu Management"
-          subtitle="Create dishes, update pricing, control availability, and keep the menu clean."
+          subtitle="Create dishes, update pricing, stock quantity, and control availability."
         />
       </AnimatedEntrance>
 
@@ -180,6 +200,11 @@ export default function ManageMenuScreen() {
               <Text style={styles.heroMetricValue}>{availableCount}</Text>
               <Text style={styles.heroMetricLabel}>Available</Text>
             </View>
+          </View>
+
+          <View style={styles.stockSummary}>
+            <Text style={styles.stockSummaryLabel}>Total Stock</Text>
+            <Text style={styles.stockSummaryValue}>{totalStock} items</Text>
           </View>
         </LinearGradient>
       </AnimatedEntrance>
@@ -219,6 +244,7 @@ export default function ManageMenuScreen() {
           placeholder="Short description"
           multiline
         />
+
         <View style={styles.formRow}>
           <View style={{ flex: 1 }}>
             <FormInput
@@ -239,6 +265,15 @@ export default function ManageMenuScreen() {
             />
           </View>
         </View>
+
+        <FormInput
+          label="Quantity"
+          value={form.quantity}
+          onChangeText={(value) => updateField("quantity", value)}
+          placeholder="10"
+          keyboardType="numeric"
+        />
+
         <FormInput
           label="Ingredients"
           value={form.ingredients}
@@ -264,6 +299,7 @@ export default function ManageMenuScreen() {
             );
           })}
         </View>
+
         {!categories.length ? (
           <Text style={styles.inlineHint}>
             Create at least one category before adding menu items.
@@ -324,6 +360,10 @@ export default function ManageMenuScreen() {
               <StatusBadge
                 label={`${item.preparationTime} min`}
                 color={COLORS.tertiary}
+              />
+              <StatusBadge
+                label={`Stock: ${item.quantity ?? 0}`}
+                color={(item.quantity ?? 0) > 0 ? COLORS.info : COLORS.warning}
               />
             </View>
 
@@ -410,6 +450,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "rgba(255,255,255,0.74)",
     marginTop: 6,
+  },
+  stockSummary: {
+    marginTop: 18,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.14)",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  stockSummaryLabel: {
+    fontFamily: FONTS.semiBold,
+    fontSize: 13,
+    color: "rgba(255,255,255,0.74)",
+  },
+  stockSummaryValue: {
+    fontFamily: FONTS.bold,
+    fontSize: 16,
+    color: COLORS.white,
   },
   formCard: {
     backgroundColor: COLORS.surface,
@@ -522,44 +581,43 @@ const styles = StyleSheet.create({
   menuHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
     gap: 12,
+    alignItems: "flex-start",
     marginTop: 14,
   },
   menuName: {
     fontFamily: FONTS.bold,
-    fontSize: 20,
+    fontSize: 18,
     color: COLORS.text,
   },
   menuMeta: {
     fontFamily: FONTS.regular,
     fontSize: 13,
     color: COLORS.textMuted,
-    marginTop: 6,
+    marginTop: 4,
   },
   menuPrice: {
     fontFamily: FONTS.bold,
     fontSize: 16,
     color: COLORS.primary,
-    marginTop: 2,
   },
   badgeStrip: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-    marginTop: 12,
+    marginTop: 14,
   },
   descriptionText: {
     fontFamily: FONTS.regular,
     fontSize: 14,
+    lineHeight: 21,
     color: COLORS.textMuted,
-    lineHeight: 22,
-    marginTop: 12,
+    marginTop: 14,
   },
   cardActions: {
     flexDirection: "row",
     gap: 10,
-    marginTop: 14,
+    marginTop: 16,
   },
   actionButton: {
     flex: 1,

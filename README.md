@@ -3,6 +3,7 @@
 A mobile frontend for a Food Order Management System built with Expo and React Native.
 
 This app supports:
+
 - Public browsing for guests
 - Authentication (login/register)
 - Role-based app flows for users and admins
@@ -21,16 +22,19 @@ This app supports:
 ## App Flows
 
 ### Public
+
 - View public home content
 - Browse categories and featured menu previews
 - Navigate to login/register
 
 ### User
+
 - Home, Menu, Cart, Orders, Profile
 - View menu details and order details
 - Place and manage food orders
 
 ### Admin
+
 - Dashboard
 - Manage categories
 - Manage menu items

@@ -4,14 +4,9 @@ import { useIsFocused } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 
 import { getMenuItemById } from "../../api/menuApi";
-import {
-  addReview,
-  deleteReview,
-  getMenuItemReviews,
-  updateReview,
-} from "../../api/reviewApi";
-import AnimatedEntrance from "../../components/AnimatedEntrance";
+import { addReview, deleteReview, getMenuItemReviews, updateReview } from "../../api/reviewApi";
 import EmptyState from "../../components/EmptyState";
+import AnimatedEntrance from "../../components/AnimatedEntrance";
 import FormInput from "../../components/FormInput";
 import PrimaryButton from "../../components/PrimaryButton";
 import ScreenContainer from "../../components/ScreenContainer";
@@ -20,17 +15,14 @@ import StatusBadge from "../../components/StatusBadge";
 import { useAuth } from "../../hooks/useAuth";
 import { useCart } from "../../hooks/useCart";
 import { COLORS, DEFAULT_IMAGE, FONTS, SHADOWS } from "../../utils/constants";
-import {
-  extractErrorMessage,
-  formatCurrency,
-  formatDate,
-} from "../../utils/helpers";
+import { extractErrorMessage, formatCurrency, formatDate } from "../../utils/helpers";
 
 export default function MenuDetailsScreen({ route }) {
   const { itemId } = route.params;
+  const isFocused = useIsFocused();
   const { user } = useAuth();
   const { addToCart } = useCart();
-  const isFocused = useIsFocused();
+
   const [item, setItem] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [reviewRating, setReviewRating] = useState(5);
@@ -52,8 +44,12 @@ export default function MenuDetailsScreen({ route }) {
         getMenuItemReviews(itemId),
       ]);
 
-      setItem(itemData.menuItem);
+      const loadedItem = itemData.menuItem;
+      setItem(loadedItem);
       setReviews(reviewData.reviews || []);
+
+      const maxStock = Math.max(1, Number(loadedItem?.quantity || 0));
+      setQuantity((current) => Math.min(current, maxStock));
 
       const currentReview = (reviewData.reviews || []).find(
         (review) => review.user?._id === user?._id
@@ -75,10 +71,23 @@ export default function MenuDetailsScreen({ route }) {
 
   const myReview = reviews.find((review) => review.user?._id === user?._id);
   const averageRating = Number(item?.averageRating || 0);
+  const availableStock = Number(item?.quantity || 0);
+  const maxSelectableQuantity = Math.max(1, availableStock);
   const estimatedTotal = Number(item?.price || 0) * quantity;
+  const isOutOfStock = !item?.isAvailable || availableStock <= 0;
 
   const handleAddToCart = async () => {
     try {
+      if (isOutOfStock) {
+        Alert.alert("Out of Stock", "This item is currently unavailable.");
+        return;
+      }
+
+      if (quantity > availableStock) {
+        Alert.alert("Stock Limit", `Only ${availableStock} item(s) are available.`);
+        return;
+      }
+
       await addToCart(itemId, quantity);
       Alert.alert("Success", "Item added to cart");
     } catch (error) {
@@ -153,8 +162,12 @@ export default function MenuDetailsScreen({ route }) {
               color={COLORS.secondary}
             />
             <StatusBadge
-              label={item?.isAvailable ? "Available" : "Unavailable"}
-              color={item?.isAvailable ? COLORS.success : COLORS.danger}
+              label={isOutOfStock ? "Out of Stock" : "Available"}
+              color={isOutOfStock ? COLORS.danger : COLORS.success}
+            />
+            <StatusBadge
+              label={`Stock: ${availableStock}`}
+              color={availableStock > 0 ? COLORS.info : COLORS.warning}
             />
           </View>
 
@@ -174,8 +187,7 @@ export default function MenuDetailsScreen({ route }) {
             <View style={styles.ratingRow}>
               <StarRating rating={averageRating} size="large" />
               <Text style={styles.ratingLabel}>
-                {averageRating.toFixed(1)} average from {item?.numberOfReviews || 0}{" "}
-                reviews
+                {averageRating.toFixed(1)} average from {item?.numberOfReviews || 0} reviews
               </Text>
             </View>
           </View>
@@ -199,8 +211,8 @@ export default function MenuDetailsScreen({ route }) {
             <Text style={styles.metricLabel}>Ingredients</Text>
           </View>
           <View style={styles.metricCard}>
-            <Text style={styles.metricValue}>{quantity}</Text>
-            <Text style={styles.metricLabel}>Current Qty</Text>
+            <Text style={styles.metricValue}>{availableStock}</Text>
+            <Text style={styles.metricLabel}>In Stock</Text>
           </View>
         </View>
       </AnimatedEntrance>
@@ -233,17 +245,28 @@ export default function MenuDetailsScreen({ route }) {
             <Pressable
               style={styles.counterButton}
               onPress={() => setQuantity((current) => Math.max(1, current - 1))}
+              disabled={isOutOfStock}
             >
               <Text style={styles.counterText}>-</Text>
             </Pressable>
             <Text style={styles.quantityText}>{quantity}</Text>
             <Pressable
               style={styles.counterButton}
-              onPress={() => setQuantity((current) => current + 1)}
+              onPress={() =>
+                setQuantity((current) =>
+                  Math.min(maxSelectableQuantity, current + 1)
+                )
+              }
+              disabled={isOutOfStock}
             >
               <Text style={styles.counterText}>+</Text>
             </Pressable>
           </View>
+          <Text style={styles.stockHint}>
+            {isOutOfStock
+              ? "This dish is out of stock."
+              : `You can add up to ${availableStock} item(s).`}
+          </Text>
         </View>
 
         <View style={styles.checkoutRow}>
@@ -251,7 +274,12 @@ export default function MenuDetailsScreen({ route }) {
             <Text style={styles.checkoutLabel}>Estimated subtotal</Text>
             <Text style={styles.checkoutValue}>{formatCurrency(estimatedTotal)}</Text>
           </View>
-          <PrimaryButton title="Add To Cart" onPress={handleAddToCart} style={styles.cta} />
+          <PrimaryButton
+            title={isOutOfStock ? "Out of Stock" : "Add To Cart"}
+            onPress={handleAddToCart}
+            style={styles.cta}
+            disabled={isOutOfStock}
+          />
         </View>
       </AnimatedEntrance>
 
@@ -338,18 +366,16 @@ const styles = StyleSheet.create({
     paddingBottom: 132,
   },
   heroCard: {
-    borderRadius: 30,
+    borderRadius: 28,
     overflow: "hidden",
-    backgroundColor: COLORS.surface,
     ...SHADOWS.strong,
   },
   imageWrap: {
     position: "relative",
-    minHeight: 360,
   },
   image: {
     width: "100%",
-    height: 360,
+    height: 320,
   },
   imageOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -360,76 +386,71 @@ const styles = StyleSheet.create({
     left: 18,
     right: 18,
     flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 10,
+    flexWrap: "wrap",
+    gap: 8,
   },
   heroContent: {
     position: "absolute",
-    left: 20,
-    right: 20,
-    bottom: 20,
+    left: 18,
+    right: 18,
+    bottom: 18,
   },
   titleRow: {
     flexDirection: "row",
+    gap: 14,
     alignItems: "flex-end",
-    gap: 12,
   },
   title: {
     fontFamily: FONTS.display,
-    fontSize: 32,
+    fontSize: 30,
     color: COLORS.white,
   },
   heroSubtitle: {
     fontFamily: FONTS.regular,
-    fontSize: 14,
+    fontSize: 13,
     color: "rgba(255,255,255,0.8)",
     marginTop: 6,
     lineHeight: 20,
   },
   pricePill: {
-    backgroundColor: "rgba(255,255,255,0.14)",
-    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    borderRadius: 999,
     paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
+    paddingVertical: 10,
   },
   price: {
     fontFamily: FONTS.bold,
-    fontSize: 18,
+    fontSize: 16,
     color: COLORS.white,
   },
   ratingRow: {
-    marginTop: 18,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.18)",
+    marginTop: 16,
+    gap: 8,
   },
   ratingLabel: {
-    fontFamily: FONTS.semiBold,
+    fontFamily: FONTS.regular,
     fontSize: 13,
     color: "rgba(255,255,255,0.82)",
-    marginTop: 8,
   },
   description: {
+    marginTop: 18,
     fontFamily: FONTS.regular,
     fontSize: 15,
-    lineHeight: 24,
+    lineHeight: 23,
     color: COLORS.textMuted,
-    marginTop: 18,
   },
   metricRow: {
     flexDirection: "row",
-    gap: 12,
-    marginTop: 18,
+    gap: 10,
+    marginTop: 20,
   },
   metricCard: {
     flex: 1,
     backgroundColor: COLORS.surface,
-    borderRadius: 24,
+    borderRadius: 22,
+    padding: 18,
     borderWidth: 1,
     borderColor: COLORS.border,
-    padding: 16,
     ...SHADOWS.soft,
   },
   metricValue: {
@@ -438,17 +459,15 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   },
   metricLabel: {
-    fontFamily: FONTS.semiBold,
+    fontFamily: FONTS.regular,
     fontSize: 12,
     color: COLORS.textMuted,
     marginTop: 6,
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
   },
   ingredientsCard: {
     marginTop: 18,
-    backgroundColor: COLORS.surfaceMuted,
-    borderRadius: 26,
+    backgroundColor: COLORS.surface,
+    borderRadius: 24,
     padding: 18,
     borderWidth: 1,
     borderColor: COLORS.border,
@@ -460,6 +479,17 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.8,
   },
+  sectionTitle: {
+    fontFamily: FONTS.display,
+    fontSize: 24,
+    color: COLORS.text,
+    marginTop: 4,
+  },
+  sectionHint: {
+    fontFamily: FONTS.bold,
+    fontSize: 14,
+    color: COLORS.primary,
+  },
   ingredientsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -467,51 +497,35 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   ingredientChip: {
+    backgroundColor: COLORS.surfaceAlt,
+    borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 999,
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.border,
   },
   ingredientText: {
     fontFamily: FONTS.semiBold,
     fontSize: 13,
     color: COLORS.text,
-    textTransform: "capitalize",
   },
   quantityCard: {
     marginTop: 18,
     backgroundColor: COLORS.surface,
-    borderRadius: 28,
+    borderRadius: 24,
+    padding: 18,
     borderWidth: 1,
     borderColor: COLORS.border,
-    padding: 20,
-    ...SHADOWS.medium,
   },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     gap: 12,
-    alignItems: "flex-start",
-  },
-  sectionTitle: {
-    fontFamily: FONTS.display,
-    fontSize: 26,
-    color: COLORS.text,
-    marginTop: 4,
-  },
-  sectionHint: {
-    fontFamily: FONTS.bold,
-    fontSize: 15,
-    color: COLORS.primary,
-    marginTop: 8,
+    alignItems: "center",
   },
   quantityPanel: {
-    marginTop: 18,
-    padding: 18,
-    borderRadius: 24,
+    marginTop: 16,
     backgroundColor: COLORS.surfaceMuted,
+    borderRadius: 20,
+    padding: 18,
   },
   panelLabel: {
     fontFamily: FONTS.semiBold,
@@ -521,85 +535,92 @@ const styles = StyleSheet.create({
   quantityRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 16,
+    justifyContent: "center",
+    gap: 20,
+    marginTop: 14,
   },
   counterButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: COLORS.white,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: COLORS.white,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
   counterText: {
     fontFamily: FONTS.bold,
-    fontSize: 24,
+    fontSize: 22,
     color: COLORS.text,
   },
   quantityText: {
     fontFamily: FONTS.display,
-    fontSize: 32,
+    fontSize: 30,
     color: COLORS.text,
+    minWidth: 48,
+    textAlign: "center",
+  },
+  stockHint: {
+    fontFamily: FONTS.regular,
+    fontSize: 12,
+    color: COLORS.textMuted,
+    marginTop: 12,
+    textAlign: "center",
   },
   checkoutRow: {
+    marginTop: 16,
     flexDirection: "row",
-    gap: 14,
-    alignItems: "center",
     justifyContent: "space-between",
-    marginTop: 18,
+    alignItems: "center",
+    gap: 12,
   },
   checkoutLabel: {
-    fontFamily: FONTS.semiBold,
-    fontSize: 13,
+    fontFamily: FONTS.regular,
+    fontSize: 12,
     color: COLORS.textMuted,
   },
   checkoutValue: {
     fontFamily: FONTS.bold,
-    fontSize: 22,
+    fontSize: 18,
     color: COLORS.text,
-    marginTop: 6,
+    marginTop: 4,
   },
   cta: {
-    minWidth: 160,
+    minWidth: 140,
   },
   reviewCard: {
-    marginTop: 20,
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 28,
-    padding: 20,
-    ...SHADOWS.medium,
-  },
-  reviewHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 12,
-    marginTop: 22,
-    marginBottom: 4,
-  },
-  reviewItem: {
+    marginTop: 18,
     backgroundColor: COLORS.surface,
     borderRadius: 24,
+    padding: 18,
     borderWidth: 1,
     borderColor: COLORS.border,
-    padding: 18,
+  },
+  reviewHeader: {
+    marginTop: 18,
+    marginBottom: 8,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  reviewItem: {
     marginTop: 12,
-    ...SHADOWS.soft,
+    backgroundColor: COLORS.surface,
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   reviewTopRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: 12,
     alignItems: "center",
+    marginBottom: 10,
   },
   reviewerName: {
     fontFamily: FONTS.bold,
-    fontSize: 16,
+    fontSize: 15,
     color: COLORS.text,
   },
   reviewDate: {
@@ -610,14 +631,14 @@ const styles = StyleSheet.create({
   },
   reviewScore: {
     fontFamily: FONTS.bold,
-    fontSize: 16,
+    fontSize: 14,
     color: COLORS.primary,
   },
   reviewComment: {
     fontFamily: FONTS.regular,
     fontSize: 14,
     color: COLORS.textMuted,
-    lineHeight: 22,
     marginTop: 10,
+    lineHeight: 21,
   },
 });
