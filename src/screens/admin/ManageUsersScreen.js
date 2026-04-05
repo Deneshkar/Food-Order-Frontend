@@ -5,6 +5,7 @@ import { LinearGradient } from "expo-linear-gradient";
 
 import {
   changeUserRole,
+  createUserByAdmin,
   deleteUserByAdmin,
   getAllUsers,
   updateUserByAdmin,
@@ -24,6 +25,8 @@ const initialForm = {
   email: "",
   phone: "",
   address: "",
+  password: "",
+  role: "user",
 };
 
 export default function ManageUsersScreen() {
@@ -31,6 +34,7 @@ export default function ManageUsersScreen() {
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState("");
   const [editingUserId, setEditingUserId] = useState("");
+  const [creating, setCreating] = useState(false);
   const [form, setForm] = useState(initialForm);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -67,17 +71,27 @@ export default function ManageUsersScreen() {
     }));
   };
 
+  const openCreateForm = () => {
+    setCreating(true);
+    setEditingUserId("");
+    setForm(initialForm);
+  };
+
   const handleEdit = (user) => {
+    setCreating(false);
     setEditingUserId(user._id);
     setForm({
       name: user.name || "",
       email: user.email || "",
       phone: user.phone || "",
       address: user.address || "",
+      password: "",
+      role: user.role || "user",
     });
   };
 
-  const resetEdit = () => {
+  const resetForm = () => {
+    setCreating(false);
     setEditingUserId("");
     setForm(initialForm);
   };
@@ -85,11 +99,32 @@ export default function ManageUsersScreen() {
   const handleSave = async () => {
     try {
       setSaving(true);
-      await updateUserByAdmin(editingUserId, form);
-      resetEdit();
+
+      if (creating) {
+        if (!form.name.trim() || !form.email.trim() || !form.password.trim()) {
+          Alert.alert("Validation", "Name, email, and password are required");
+          return;
+        }
+
+        await createUserByAdmin(form);
+        Alert.alert("Success", "User created successfully");
+      } else {
+        await updateUserByAdmin(editingUserId, {
+          name: form.name,
+          email: form.email,
+          phone: form.phone,
+          address: form.address,
+        });
+        Alert.alert("Success", "User updated successfully");
+      }
+
+      resetForm();
       await loadUsers();
     } catch (error) {
-      Alert.alert("Update Error", extractErrorMessage(error, "Failed to update user"));
+      Alert.alert(
+        creating ? "Create Error" : "Update Error",
+        extractErrorMessage(error, creating ? "Failed to create user" : "Failed to update user")
+      );
     } finally {
       setSaving(false);
     }
@@ -106,12 +141,21 @@ export default function ManageUsersScreen() {
   };
 
   const handleDelete = async (id) => {
-    try {
-      await deleteUserByAdmin(id);
-      await loadUsers();
-    } catch (error) {
-      Alert.alert("Delete Error", extractErrorMessage(error, "Failed to delete user"));
-    }
+    Alert.alert("Delete User", "Are you sure you want to delete this user?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await deleteUserByAdmin(id);
+            await loadUsers();
+          } catch (error) {
+            Alert.alert("Delete Error", extractErrorMessage(error, "Failed to delete user"));
+          }
+        },
+      },
+    ]);
   };
 
   return (
@@ -120,7 +164,7 @@ export default function ManageUsersScreen() {
         <SectionTitle
           eyebrow="Admin"
           title="User Management"
-          subtitle="Search users, update records, adjust roles, and protect the account list."
+          subtitle="Create, search, update, change roles, and delete user accounts."
         />
       </AnimatedEntrance>
 
@@ -157,16 +201,22 @@ export default function ManageUsersScreen() {
           placeholder="Search by name or email"
         />
         <PrimaryButton title="Search Directory" onPress={loadUsers} />
+        <PrimaryButton title="Create New User" variant="outline" onPress={openCreateForm} />
       </AnimatedEntrance>
 
-      {editingUserId ? (
+      {(creating || editingUserId) ? (
         <AnimatedEntrance delay={140} trigger={isFocused} style={styles.formCard}>
           <View style={styles.formHeader}>
             <View>
-              <Text style={styles.formEyebrow}>Editing User</Text>
-              <Text style={styles.editTitle}>Update account details</Text>
+              <Text style={styles.formEyebrow}>{creating ? "Create User" : "Editing User"}</Text>
+              <Text style={styles.editTitle}>
+                {creating ? "Add a new account" : "Update account details"}
+              </Text>
             </View>
-            <StatusBadge label="Live Edit" color={COLORS.info} />
+            <StatusBadge
+              label={creating ? "New User" : "Live Edit"}
+              color={creating ? COLORS.success : COLORS.info}
+            />
           </View>
 
           <FormInput
@@ -183,6 +233,16 @@ export default function ManageUsersScreen() {
             keyboardType="email-address"
             autoCapitalize="none"
           />
+          {creating ? (
+            <FormInput
+              label="Password"
+              value={form.password}
+              onChangeText={(value) => updateField("password", value)}
+              placeholder="Minimum 6 characters"
+              secureTextEntry
+              autoCapitalize="none"
+            />
+          ) : null}
           <FormInput
             label="Phone"
             value={form.phone}
@@ -196,8 +256,13 @@ export default function ManageUsersScreen() {
             placeholder="Address"
             multiline
           />
-          <PrimaryButton title="Save User" onPress={handleSave} loading={saving} />
-          <PrimaryButton title="Cancel" variant="outline" onPress={resetEdit} />
+
+          <PrimaryButton
+            title={creating ? "Create User" : "Save User"}
+            onPress={handleSave}
+            loading={saving}
+          />
+          <PrimaryButton title="Cancel" variant="outline" onPress={resetForm} />
         </AnimatedEntrance>
       ) : null}
 
@@ -266,7 +331,7 @@ export default function ManageUsersScreen() {
         <AnimatedEntrance delay={150} trigger={isFocused}>
           <EmptyState
             title="No users found"
-            description="Try another search term or create users from the auth screens."
+            description="Try another search term or create a new user above."
           />
         </AnimatedEntrance>
       )}
@@ -327,109 +392,102 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   searchCard: {
-    marginTop: 16,
+    marginTop: 18,
     backgroundColor: COLORS.surface,
-    borderRadius: 28,
+    borderRadius: 26,
+    padding: 18,
     borderWidth: 1,
     borderColor: COLORS.border,
-    padding: 18,
-    ...SHADOWS.soft,
   },
   formCard: {
+    marginTop: 18,
     backgroundColor: COLORS.surface,
-    borderRadius: 30,
+    borderRadius: 26,
+    padding: 18,
     borderWidth: 1,
     borderColor: COLORS.border,
-    padding: 20,
-    marginTop: 16,
-    ...SHADOWS.medium,
   },
   formHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "center",
     gap: 12,
-    alignItems: "flex-start",
-    marginBottom: 2,
+    marginBottom: 10,
   },
   formEyebrow: {
-    fontFamily: FONTS.bold,
+    fontFamily: FONTS.semiBold,
     fontSize: 12,
-    color: COLORS.primary,
+    color: COLORS.textMuted,
     textTransform: "uppercase",
-    letterSpacing: 0.8,
   },
   editTitle: {
-    fontFamily: FONTS.display,
-    fontSize: 26,
+    fontFamily: FONTS.bold,
+    fontSize: 20,
     color: COLORS.text,
     marginTop: 4,
   },
   card: {
+    marginTop: 16,
     backgroundColor: COLORS.surface,
-    borderRadius: 28,
+    borderRadius: 26,
+    padding: 18,
     borderWidth: 1,
     borderColor: COLORS.border,
-    padding: 18,
-    marginTop: 16,
     ...SHADOWS.soft,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     gap: 12,
-    alignItems: "flex-start",
   },
   identity: {
     flexDirection: "row",
-    flex: 1,
     gap: 12,
+    flex: 1,
   },
   avatar: {
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: COLORS.surfaceAlt,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: COLORS.surfaceAlt,
   },
   avatarText: {
     fontFamily: FONTS.bold,
-    fontSize: 20,
-    color: COLORS.primaryDark,
+    fontSize: 18,
+    color: COLORS.primary,
   },
   userName: {
     fontFamily: FONTS.bold,
-    fontSize: 18,
+    fontSize: 17,
     color: COLORS.text,
   },
   userEmail: {
     fontFamily: FONTS.regular,
     fontSize: 13,
     color: COLORS.textMuted,
-    marginTop: 5,
+    marginTop: 4,
   },
   metaPanel: {
     marginTop: 14,
-    padding: 14,
-    borderRadius: 22,
-    backgroundColor: COLORS.surfaceMuted,
-    gap: 12,
+    gap: 10,
   },
   metaBlock: {
-    gap: 6,
+    backgroundColor: COLORS.surfaceMuted,
+    borderRadius: 18,
+    padding: 14,
   },
   metaLabel: {
-    fontFamily: FONTS.bold,
-    fontSize: 11,
-    color: COLORS.primary,
-    textTransform: "uppercase",
-    letterSpacing: 0.7,
+    fontFamily: FONTS.semiBold,
+    fontSize: 12,
+    color: COLORS.textMuted,
   },
   metaValue: {
-    fontFamily: FONTS.semiBold,
+    fontFamily: FONTS.regular,
     fontSize: 14,
     color: COLORS.text,
-    lineHeight: 20,
+    marginTop: 5,
   },
   actionRow: {
     flexDirection: "row",

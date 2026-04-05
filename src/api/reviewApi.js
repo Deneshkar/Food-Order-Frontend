@@ -15,6 +15,11 @@ export const getMyReviews = async () => {
   return response.data;
 };
 
+export const getReviewById = async (id) => {
+  const response = await apiClient.get(`/reviews/${id}`);
+  return response.data;
+};
+
 export const updateReview = async (id, payload) => {
   const response = await apiClient.put(`/reviews/${id}`, payload);
   return response.data;

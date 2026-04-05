@@ -45,6 +45,16 @@ export const getOrderById = async (id) => {
   return response.data;
 };
 
+export const updateOrder = async (id, payload) => {
+  const response = await apiClient.put(`/orders/${id}`, payload);
+  return response.data;
+};
+
+export const deleteOrder = async (id) => {
+  const response = await apiClient.delete(`/orders/${id}`);
+  return response.data;
+};
+
 export const updateOrderStatus = async (id, orderStatus) => {
   const response = await apiClient.patch(`/orders/${id}/status`, {
     orderStatus,

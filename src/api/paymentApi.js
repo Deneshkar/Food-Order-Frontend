@@ -20,6 +20,16 @@ export const getPaymentById = async (id) => {
   return response.data;
 };
 
+export const updatePayment = async (id, payload) => {
+  const response = await apiClient.put(`/payments/${id}`, payload);
+  return response.data;
+};
+
+export const deletePayment = async (id) => {
+  const response = await apiClient.delete(`/payments/${id}`);
+  return response.data;
+};
+
 export const updatePaymentStatus = async (id, paymentStatus) => {
   const response = await apiClient.patch(`/payments/${id}/status`, {
     paymentStatus,

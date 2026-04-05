@@ -3,10 +3,19 @@ import { Alert, StyleSheet, Text, View } from "react-native";
 import { useIsFocused } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 
-import { getAllOrders, updateOrderStatus } from "../../api/orderApi";
-import { updatePaymentStatus } from "../../api/paymentApi";
+import {
+  deleteOrder,
+  getAllOrders,
+  updateOrder,
+  updateOrderStatus,
+} from "../../api/orderApi";
+import {
+  deletePayment,
+  updatePaymentStatus,
+} from "../../api/paymentApi";
 import AnimatedEntrance from "../../components/AnimatedEntrance";
 import EmptyState from "../../components/EmptyState";
+import FormInput from "../../components/FormInput";
 import PrimaryButton from "../../components/PrimaryButton";
 import ScreenContainer from "../../components/ScreenContainer";
 import SectionTitle from "../../components/SectionTitle";
@@ -29,6 +38,11 @@ export default function ManageOrdersScreen() {
   const isFocused = useIsFocused();
   const [orders, setOrders] = useState([]);
   const [error, setError] = useState("");
+
+  const [editingOrderId, setEditingOrderId] = useState("");
+  const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (isFocused) {
@@ -53,7 +67,6 @@ export default function ManageOrdersScreen() {
       if (order.paymentStatus === "Paid") {
         return total + Number(order.totalPrice || 0);
       }
-
       return total;
     }, 0);
 
@@ -63,6 +76,70 @@ export default function ManageOrdersScreen() {
       paidRevenue,
     };
   }, [orders]);
+
+  const handleStartEdit = (order) => {
+    setEditingOrderId(order._id);
+    setDeliveryAddress(order.deliveryAddress || "");
+    setNotes(order.notes || "");
+  };
+
+  const handleCancelEdit = () => {
+    setEditingOrderId("");
+    setDeliveryAddress("");
+    setNotes("");
+  };
+
+  const handleSaveEdit = async () => {
+    try {
+      setSaving(true);
+      await updateOrder(editingOrderId, {
+        deliveryAddress,
+        notes,
+      });
+      handleCancelEdit();
+      await loadOrders();
+    } catch (error) {
+      Alert.alert("Order Error", extractErrorMessage(error, "Failed to update order"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteOrder = async (orderId) => {
+    Alert.alert("Delete Order", "Are you sure you want to delete this order?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await deleteOrder(orderId);
+            await loadOrders();
+          } catch (error) {
+            Alert.alert("Delete Error", extractErrorMessage(error, "Failed to delete order"));
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleDeletePayment = async (paymentId) => {
+    Alert.alert("Delete Payment", "Are you sure you want to delete this payment?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await deletePayment(paymentId);
+            await loadOrders();
+          } catch (error) {
+            Alert.alert("Delete Error", extractErrorMessage(error, "Failed to delete payment"));
+          }
+        },
+      },
+    ]);
+  };
 
   const handleNextOrderStatus = async (order) => {
     try {
@@ -101,7 +178,7 @@ export default function ManageOrdersScreen() {
         <SectionTitle
           eyebrow="Admin"
           title="Order Management"
-          subtitle="Track every order, push it through the delivery flow, and keep payments in sync."
+          subtitle="Track, edit, update, delete orders, and keep payments in sync."
         />
       </AnimatedEntrance>
 
@@ -148,6 +225,8 @@ export default function ManageOrdersScreen() {
               ? "Refund Payment"
               : "Mark Payment Paid";
 
+          const isEditingThis = editingOrderId === order._id;
+
           return (
             <AnimatedEntrance
               key={order._id}
@@ -174,24 +253,45 @@ export default function ManageOrdersScreen() {
                 />
               </View>
 
-              <View style={styles.detailsGrid}>
-                <View style={styles.detailCell}>
-                  <Text style={styles.detailLabel}>Customer</Text>
-                  <Text style={styles.detailValue}>{order.user?.name || "Customer"}</Text>
+              {isEditingThis ? (
+                <View style={styles.editCard}>
+                  <FormInput
+                    label="Delivery Address"
+                    value={deliveryAddress}
+                    onChangeText={setDeliveryAddress}
+                    placeholder="Delivery address"
+                    multiline
+                  />
+                  <FormInput
+                    label="Notes"
+                    value={notes}
+                    onChangeText={setNotes}
+                    placeholder="Order notes"
+                    multiline
+                  />
+                  <PrimaryButton title="Save Order" onPress={handleSaveEdit} loading={saving} />
+                  <PrimaryButton title="Cancel" variant="outline" onPress={handleCancelEdit} />
                 </View>
-                <View style={styles.detailCell}>
-                  <Text style={styles.detailLabel}>Items</Text>
-                  <Text style={styles.detailValue}>
-                    {order.orderItems?.length || 0} dishes
-                  </Text>
+              ) : (
+                <View style={styles.detailsGrid}>
+                  <View style={styles.detailCell}>
+                    <Text style={styles.detailLabel}>Customer</Text>
+                    <Text style={styles.detailValue}>{order.user?.name || "Customer"}</Text>
+                  </View>
+                  <View style={styles.detailCell}>
+                    <Text style={styles.detailLabel}>Items</Text>
+                    <Text style={styles.detailValue}>
+                      {order.orderItems?.length || 0} dishes
+                    </Text>
+                  </View>
+                  <View style={styles.detailCellWide}>
+                    <Text style={styles.detailLabel}>Delivery Address</Text>
+                    <Text style={styles.detailValue}>
+                      {order.deliveryAddress || "No address provided"}
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.detailCellWide}>
-                  <Text style={styles.detailLabel}>Delivery Address</Text>
-                  <Text style={styles.detailValue}>
-                    {order.deliveryAddress || "No address provided"}
-                  </Text>
-                </View>
-              </View>
+              )}
 
               <View style={styles.progressWrap}>
                 {ORDER_STATUS_FLOW.map((status, statusIndex) => {
@@ -221,13 +321,36 @@ export default function ManageOrdersScreen() {
                   onPress={() => handleNextOrderStatus(order)}
                 />
               ) : null}
+
+              <View style={styles.actionRow}>
+                <PrimaryButton
+                  title="Edit Order"
+                  variant="outline"
+                  style={styles.actionButton}
+                  onPress={() => handleStartEdit(order)}
+                />
+                <PrimaryButton
+                  title="Delete Order"
+                  variant="ghost"
+                  style={styles.actionButton}
+                  onPress={() => handleDeleteOrder(order._id)}
+                />
+              </View>
+
               {order.payment?._id &&
               ["Pending", "Failed", "Paid"].includes(order.payment.paymentStatus) ? (
-                <PrimaryButton
-                  title={paymentActionLabel}
-                  variant="outline"
-                  onPress={() => handlePaymentAction(order)}
-                />
+                <>
+                  <PrimaryButton
+                    title={paymentActionLabel}
+                    variant="outline"
+                    onPress={() => handlePaymentAction(order)}
+                  />
+                  <PrimaryButton
+                    title="Delete Payment"
+                    variant="ghost"
+                    onPress={() => handleDeletePayment(order.payment._id)}
+                  />
+                </>
               ) : null}
             </AnimatedEntrance>
           );
@@ -312,38 +435,38 @@ const styles = StyleSheet.create({
   },
   revenueValue: {
     fontFamily: FONTS.bold,
-    fontSize: 20,
+    fontSize: 16,
     color: COLORS.white,
   },
   card: {
+    marginTop: 16,
     backgroundColor: COLORS.surface,
     borderRadius: 28,
+    padding: 18,
     borderWidth: 1,
     borderColor: COLORS.border,
-    padding: 18,
-    marginTop: 16,
     ...SHADOWS.soft,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     gap: 12,
-    alignItems: "flex-start",
+    alignItems: "center",
   },
   orderId: {
     fontFamily: FONTS.bold,
-    fontSize: 18,
+    fontSize: 17,
     color: COLORS.text,
   },
   metaText: {
     fontFamily: FONTS.regular,
-    fontSize: 13,
+    fontSize: 12,
     color: COLORS.textMuted,
-    marginTop: 6,
+    marginTop: 4,
   },
   orderTotal: {
     fontFamily: FONTS.bold,
-    fontSize: 18,
+    fontSize: 16,
     color: COLORS.primary,
   },
   badgeRow: {
@@ -353,37 +476,32 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   detailsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-    marginTop: 14,
+    marginTop: 16,
+    gap: 10,
   },
   detailCell: {
-    width: "47%",
-    minWidth: 140,
     backgroundColor: COLORS.surfaceMuted,
-    borderRadius: 20,
+    borderRadius: 18,
     padding: 14,
   },
   detailCellWide: {
-    width: "100%",
     backgroundColor: COLORS.surfaceMuted,
-    borderRadius: 20,
+    borderRadius: 18,
     padding: 14,
   },
   detailLabel: {
-    fontFamily: FONTS.bold,
-    fontSize: 11,
-    color: COLORS.primary,
-    textTransform: "uppercase",
-    letterSpacing: 0.7,
+    fontFamily: FONTS.semiBold,
+    fontSize: 12,
+    color: COLORS.textMuted,
   },
   detailValue: {
-    fontFamily: FONTS.semiBold,
+    fontFamily: FONTS.regular,
     fontSize: 14,
     color: COLORS.text,
-    marginTop: 6,
-    lineHeight: 20,
+    marginTop: 5,
+  },
+  editCard: {
+    marginTop: 14,
   },
   progressWrap: {
     flexDirection: "row",
@@ -393,20 +511,28 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   progressChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 9,
     borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     backgroundColor: COLORS.surfaceMuted,
   },
   progressChipActive: {
-    backgroundColor: `${COLORS.secondary}18`,
+    backgroundColor: "rgba(198, 93, 46, 0.12)",
   },
   progressText: {
-    fontFamily: FONTS.bold,
-    fontSize: 11,
+    fontFamily: FONTS.semiBold,
+    fontSize: 12,
     color: COLORS.textMuted,
   },
   progressTextActive: {
-    color: COLORS.secondary,
+    color: COLORS.primary,
+  },
+  actionRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 10,
+  },
+  actionButton: {
+    flex: 1,
   },
 });

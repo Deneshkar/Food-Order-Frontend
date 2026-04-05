@@ -24,6 +24,16 @@ const buildProfileFormData = (payload) => {
   return formData;
 };
 
+export const createUserByAdmin = async (payload) => {
+  const response = await apiClient.post("/users", buildProfileFormData(payload), {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+
+  return response.data;
+};
+
 export const updateMyProfile = async (payload) => {
   const response = await apiClient.put(
     "/users/profile",
