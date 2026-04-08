@@ -14,6 +14,34 @@ import { COLORS, FONTS, SHADOWS } from "../utils/constants";
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
+const MenuStack = createNativeStackNavigator();
+
+function MenuStackNavigator() {
+  return (
+    <MenuStack.Navigator
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: COLORS.surface,
+        },
+        headerTintColor: COLORS.text,
+        headerTitleStyle: {
+          fontFamily: FONTS.bold,
+        },
+      }}
+    >
+      <MenuStack.Screen
+        name="MenuList"
+        component={MenuScreen}
+        options={{ headerShown: false }}
+      />
+      <MenuStack.Screen
+        name="MenuDetails"
+        component={MenuDetailsScreen}
+        options={{ title: "Menu Details" }}
+      />
+    </MenuStack.Navigator>
+  );
+}
 
 function UserTabs() {
   return (
@@ -78,7 +106,7 @@ function UserTabs() {
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Menu" component={MenuScreen} />
+      <Tab.Screen name="Menu" component={MenuStackNavigator} />
       <Tab.Screen name="Cart" component={CartScreen} />
       <Tab.Screen name="Orders" component={OrdersScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
@@ -103,11 +131,6 @@ export default function UserNavigator() {
         name="UserTabs"
         component={UserTabs}
         options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="MenuDetails"
-        component={MenuDetailsScreen}
-        options={{ title: "Menu Details" }}
       />
       <Stack.Screen
         name="OrderDetails"

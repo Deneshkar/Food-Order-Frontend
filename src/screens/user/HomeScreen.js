@@ -63,7 +63,14 @@ export default function HomeScreen({ navigation }) {
             <Text style={styles.metricLabel}>Ordering</Text>
           </View>
         </View>
-        <Pressable style={styles.heroButton} onPress={() => navigation.navigate("Menu")}>
+        <Pressable
+          style={styles.heroButton}
+          onPress={() =>
+            navigation.navigate("Menu", {
+              screen: "MenuList",
+            })
+          }
+        >
           <Text style={styles.heroButtonText}>Explore the Menu</Text>
         </Pressable>
       </LinearGradient>
@@ -91,7 +98,10 @@ export default function HomeScreen({ navigation }) {
                 <Pressable
                   onPress={() =>
                     navigation.navigate("Menu", {
-                      selectedCategoryId: category._id,
+                      screen: "MenuList",
+                      params: {
+                        selectedCategoryId: category._id,
+                      },
                     })
                   }
                 >
@@ -119,7 +129,12 @@ export default function HomeScreen({ navigation }) {
           <MenuCard
             key={item._id}
             item={item}
-            onPress={() => navigation.navigate("MenuDetails", { itemId: item._id })}
+            onPress={() =>
+              navigation.navigate("Menu", {
+                screen: "MenuDetails",
+                params: { itemId: item._id },
+              })
+            }
           />
         ))
       ) : (

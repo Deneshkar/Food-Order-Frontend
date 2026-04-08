@@ -69,9 +69,7 @@ export const PAYMENT_STATUS_FLOW = ["Pending", "Paid", "Failed", "Refunded"];
 
 export const PAYMENT_METHODS = [
   "Cash on Delivery",
-  "Card",
   "Online Transfer",
-  "Wallet",
 ];
 
 export const DEFAULT_IMAGE =

@@ -4,7 +4,6 @@ import { useIsFocused, useNavigation } from "@react-navigation/native";
 
 import { deleteOrder, getOrderById, updateOrder } from "../../api/orderApi";
 import {
-  deletePayment,
   recordPayment,
   updatePayment,
 } from "../../api/paymentApi";
@@ -53,9 +52,12 @@ export default function OrderDetailsScreen({ route }) {
       setError("");
       const data = await getOrderById(orderId);
       const loadedOrder = data.order;
+      const resolvedPaymentMethod = PAYMENT_METHODS.includes(loadedOrder?.paymentMethod)
+        ? loadedOrder.paymentMethod
+        : PAYMENT_METHODS[0];
 
       setOrder(loadedOrder);
-      setPaymentMethod(loadedOrder?.paymentMethod || PAYMENT_METHODS[0]);
+      setPaymentMethod(resolvedPaymentMethod);
       setTransactionId(loadedOrder?.payment?.transactionId || "");
       setNotes(loadedOrder?.payment?.notes || "");
       setDeliveryAddress(loadedOrder?.deliveryAddress || "");
@@ -92,35 +94,6 @@ export default function OrderDetailsScreen({ route }) {
     } finally {
       setPaymentLoading(false);
     }
-  };
-
-  const handleDeletePayment = async () => {
-    if (!order?.payment?._id) {
-      return;
-    }
-
-    Alert.alert("Delete Payment", "Are you sure you want to delete this payment?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            setPaymentLoading(true);
-            await deletePayment(order.payment._id);
-            Alert.alert("Deleted", "Payment deleted successfully.");
-            await loadOrder();
-          } catch (error) {
-            Alert.alert(
-              "Delete Payment Error",
-              extractErrorMessage(error, "Failed to delete payment")
-            );
-          } finally {
-            setPaymentLoading(false);
-          }
-        },
-      },
-    ]);
   };
 
   const handleUpdateOrder = async () => {
@@ -334,15 +307,6 @@ export default function OrderDetailsScreen({ route }) {
           onPress={handleRecordPayment}
           loading={paymentLoading}
         />
-
-        {order.payment?._id ? (
-          <PrimaryButton
-            title="Delete Payment"
-            variant="ghost"
-            onPress={handleDeletePayment}
-            loading={paymentLoading}
-          />
-        ) : null}
       </View>
     </ScreenContainer>
   );
