@@ -70,11 +70,12 @@ export default function OrderDetailsScreen({ route }) {
   const handleRecordPayment = async () => {
     try {
       setPaymentLoading(true);
+      const resolvedTransactionId = paymentMethod === "Online Transfer" ? transactionId : "";
 
       if (order?.payment?._id) {
         await updatePayment(order.payment._id, {
           paymentMethod,
-          transactionId,
+          transactionId: resolvedTransactionId,
           notes,
         });
         Alert.alert("Payment Updated", "Payment information updated successfully.");
@@ -82,7 +83,7 @@ export default function OrderDetailsScreen({ route }) {
         await recordPayment({
           orderId,
           paymentMethod,
-          transactionId,
+          transactionId: resolvedTransactionId,
           notes,
         });
         Alert.alert("Payment Saved", "Payment information recorded successfully.");
@@ -152,6 +153,7 @@ export default function OrderDetailsScreen({ route }) {
   }
 
   const canEditOrDeleteOrder = order.orderStatus === "Pending";
+  const showTransactionId = paymentMethod === "Online Transfer";
 
   return (
     <ScreenContainer>
@@ -273,7 +275,13 @@ export default function OrderDetailsScreen({ route }) {
               <Pressable
                 key={method}
                 style={[styles.methodChip, active && styles.activeMethodChip]}
-                onPress={() => setPaymentMethod(method)}
+                onPress={() => {
+                  setPaymentMethod(method);
+
+                  if (method !== "Online Transfer") {
+                    setTransactionId("");
+                  }
+                }}
               >
                 <Text
                   style={[
@@ -288,12 +296,14 @@ export default function OrderDetailsScreen({ route }) {
           })}
         </View>
 
-        <FormInput
-          label="Transaction ID"
-          value={transactionId}
-          onChangeText={setTransactionId}
-          placeholder="Only needed for digital payments"
-        />
+        {showTransactionId ? (
+          <FormInput
+            label="Transaction ID"
+            value={transactionId}
+            onChangeText={setTransactionId}
+            placeholder="Only needed for digital payments"
+          />
+        ) : null}
         <FormInput
           label="Notes"
           value={notes}

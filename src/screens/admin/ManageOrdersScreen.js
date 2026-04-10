@@ -220,6 +220,13 @@ export default function ManageOrdersScreen() {
         orders.map((order, index) => {
           const currentIndex = ORDER_STATUS_FLOW.indexOf(order.orderStatus);
           const nextStatus = ORDER_STATUS_FLOW[currentIndex + 1];
+          const resolvedPaymentMethod =
+            order.payment?.paymentMethod || order.paymentMethod || "Not selected";
+          const normalizedPaymentMethod = resolvedPaymentMethod.toLowerCase();
+          const isOnlinePayment =
+            normalizedPaymentMethod === "online transfer" ||
+            normalizedPaymentMethod === "online transaction";
+          const transactionId = (order.payment?.transactionId || "").trim();
           const paymentActionLabel =
             order.payment?.paymentStatus === "Paid"
               ? "Refund Payment"
@@ -290,6 +297,18 @@ export default function ManageOrdersScreen() {
                       {order.deliveryAddress || "No address provided"}
                     </Text>
                   </View>
+                  <View style={styles.detailCell}>
+                    <Text style={styles.detailLabel}>Payment Type</Text>
+                    <Text style={styles.detailValue}>{resolvedPaymentMethod}</Text>
+                  </View>
+                  {isOnlinePayment ? (
+                    <View style={styles.detailCellWide}>
+                      <Text style={styles.detailLabel}>Transaction ID</Text>
+                      <Text style={styles.detailValue}>
+                        {transactionId || "Not provided"}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
               )}
 
